@@ -1,7 +1,6 @@
 /*  Sample chat client for exploring the use of network functions in C
- *  Written by Jason Watts and John Rodkey, based on original concepts by Thomas
- * Cantrell
- *
+ *  Written by and John Rodkey, based on original concepts by Thomas Cantrell
+ *  Expanded on by Json Watts
  */
 
 #include <arpa/inet.h>
@@ -166,5 +165,4 @@ int main(int argc, char *argv[]) {
   pthread_join(thread2, NULL);
 
 }
-
 
