@@ -12,57 +12,27 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <time.h>
+#include <pthread.h> // for multithreading
 
 #define SERVER "10.115.20.250"
-#define PORT 49153
+#define PORT 49154
 #define BUFSIZE 1024
+
+pthread_t thread1, thread2;
+
+int is_done = 0;
+int len;
+int fd = 0;
+int origbuffer;
+char buffer = 0;
 
 // prototyping the functions defined below main
 int connect2v4stream(char *, int); 
 int sendout(int, char *);
 void recvandprint(int, char *);
+void send_threads(void *);
+void recv_thread(void *);
 
-
-int main(int argc, char *argv[]) {
-  int fd, len;
-  char *name, *buffer, *origbuffer;
-  struct timeval timev;
-
-  fd = connect2v4stream(SERVER, PORT);
-
-  /* Setup recv timeout for .5 seconds */
-  timev.tv_sec = 0;
-  timev.tv_usec = 1000 * 500;
-  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timev, sizeof(timev));
-
-  /* set name based on arguments */
-  if (argc < 2) {
-    printf("Usage: chat-client <screenname>\n");
-    exit(1);
-  }
-  name = argv[1];
-  len = strlen(name);
-  name[len] = '\n';     /*insert new line*/
-  name[len + 1] = '\0'; /* reterminate the string */
-  sendout(fd, name);
-
-  int is_done = 0;
-  while (!is_done) {
-    recvandprint(fd, buffer); /* print out any input from the socket */
-
-    len = BUFSIZE;
-    buffer = malloc(len + 1);
-    origbuffer = buffer;
-    if (getline(&buffer, (size_t *)&len, stdin) > 1) {
-      /* getline returns 1 for "\n", -1 for error. and 0 for no input */
-      sendout(fd, buffer);
-    }
-
-    is_done = (strcmp(buffer, "quit\n")) == 0;
-
-    free(origbuffer);
-  }
-}
 
 /* Create a TCP connection to a server on the designated port
  * return a file descripor to the socket */
@@ -78,7 +48,7 @@ int connect2v4stream(char *srv, int port) {
 
   if ((ret = inet_pton(AF_INET, SERVER, &sin.sin_addr)) <= 0) {
     printf("ERROR: trouble converting using inet_pton. \
-           return value = %d, errno = %d\n", ret, errno);
+        return value = %d, errno = %d\n", ret, errno);
     exit(errno);
   }
 
@@ -131,4 +101,70 @@ void recvandprint(int fd, char *buff) {
     free(buff);
   }
 }
+
+
+
+void send_threads(void *thing) {
+  len = BUFSIZE;
+  buffer = malloc(len + 1);
+  origbuffer = buffer;
+  if (getline(&buffer, (size_t *)&len, stdin) > 1) {
+    /* getline returns 1 for "\n", -1 for error. and 0 for no input */
+    sendout(fd, buffer);
+  }
+
+  is_done = (strcmp(buffer, "quit\n")) == 0;
+
+  free(origbuffer);
+
+}
+
+
+
+void recv_threads(void *thing) {
+  buffer = malloc(len + 1);
+
+  while(! is_done){
+    recvandprint(fd, buffer);
+  }
+
+
+}
+
+
+int main(int argc, char *argv[]) {
+  int fd, len;
+  char *name, *buffer, *origbuffer;
+  struct timeval timev;
+
+  fd = connect2v4stream(SERVER, PORT);
+
+  /* Setup recv timeout for .5 seconds */
+  timev.tv_sec = 0;
+  timev.tv_usec = 1000 * 500;
+  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timev, sizeof(timev));
+
+  /* set name based on arguments */
+  if (argc < 2) {
+    printf("Usage: chat-client <screenname>\n");
+    exit(1);
+  }
+  name = argv[1];
+  len = strlen(name);
+  name[len] = '\n';     /*insert new line*/
+  name[len + 1] = '\0'; /* reterminate the string */
+  sendout(fd, name);
+
+  int is_done = 0;
+  while (!is_done) {
+    recvandprint(fd, buffer); /* print out any input from the socket */
+  }
+
+  pthread_create(&thread1, NULL, send_threads, NULL);
+  pthread_create(&thread2, NULL, send_threads, NULL);
+  pthread_join(thread1, NULL);
+  pthread_join(thread2, NULL);
+
+}
+
 
